@@ -1,0 +1,41 @@
+{
+  "name": "lightning-wallet-mcp",
+  "version": "0.1.0",
+  "description": "MCP server that gives AI agents a Bitcoin Lightning wallet — pay invoices, fetch L402 APIs, manage budgets",
+  "type": "module",
+  "bin": {
+    "lightning-wallet-mcp": "index.js"
+  },
+  "files": [
+    "index.js",
+    "tools.js",
+    "auth.js",
+    "lnd-gateway.js"
+  ],
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "bitcoin",
+    "lightning",
+    "lnd",
+    "litd",
+    "wallet",
+    "l402",
+    "agent",
+    "payments",
+    "macaroon",
+    "model-context-protocol"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PraneethGunas/lightning-wallet-mcp"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^3.24.4"
+  }
+}
