@@ -24,15 +24,15 @@ const webhookUrl = process.env.AEGIS_WEBHOOK_URL || null;
 
 if (!macaroon) {
   process.stderr.write(`
-lightning-wallet-mcp — Bitcoin Lightning wallet MCP server
+ln-mcp — Bitcoin Lightning wallet MCP server
 
 Configure via environment variables in your Claude Desktop MCP config:
 
 {
   "mcpServers": {
-    "lightning-wallet-mcp": {
+    "ln-mcp": {
       "command": "npx",
-      "args": ["-y", "lightning-wallet-mcp"],
+      "args": ["-y", "ln-mcp"],
       "env": {
         "LND_MACAROON_BASE64": "<your scoped macaroon>",
         "LND_REST_HOST": "https://localhost:8080"
@@ -69,7 +69,7 @@ function getAgentContext() {
 
 // ── Server ──────────────────────────────────────────────────────────────────
 const server = new McpServer({
-  name: "lightning-wallet-mcp",
+  name: "ln-mcp",
   version: "0.2.0",
   description: "Bitcoin Lightning wallet — pay invoices within your macaroon-enforced budget",
   instructions: `You are connected to a Bitcoin Lightning wallet on mainnet. You can pay for things autonomously.
@@ -121,7 +121,7 @@ if (httpPort) {
 
     if (url.pathname === "/health") {
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ status: "ok", server: "lightning-wallet-mcp", transport: "http" }));
+      res.end(JSON.stringify({ status: "ok", server: "ln-mcp", transport: "http" }));
       return;
     }
 

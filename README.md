@@ -1,4 +1,4 @@
-# lightning-wallet-mcp
+# ln-mcp
 
 MCP server that gives AI agents a Bitcoin Lightning wallet. Pay invoices, fetch L402 APIs, and manage spending budgets — all through the Model Context Protocol.
 
@@ -7,7 +7,7 @@ Works with **Claude Desktop**, **Claude Code**, **ChatGPT**, and **Gemini CLI**.
 ## Quick Start
 
 ```bash
-npx lightning-wallet-mcp
+npx ln-mcp
 ```
 
 ### Claude Desktop
@@ -17,9 +17,9 @@ Add to Claude Desktop → Settings → Developer → Edit Config:
 ```json
 {
   "mcpServers": {
-    "lightning-wallet-mcp": {
+    "ln-mcp": {
       "command": "npx",
-      "args": ["-y", "lightning-wallet-mcp"],
+      "args": ["-y", "ln-mcp"],
       "env": {
         "LND_MACAROON_BASE64": "<your scoped macaroon>",
         "LND_REST_HOST": "https://localhost:8080",
@@ -33,17 +33,17 @@ Add to Claude Desktop → Settings → Developer → Edit Config:
 ### Claude Code
 
 ```bash
-claude mcp add lightning-wallet-mcp \
+claude mcp add ln-mcp \
   -e 'LND_MACAROON_BASE64=<macaroon>' \
   -e LND_REST_HOST=https://localhost:8080 \
   -e NODE_TLS_REJECT_UNAUTHORIZED=0 \
-  -- npx lightning-wallet-mcp
+  -- npx ln-mcp
 ```
 
 ### ChatGPT (HTTP mode)
 
 ```bash
-HTTP_PORT=3004 LND_MACAROON_BASE64=<macaroon> LND_REST_HOST=https://localhost:8080 npx lightning-wallet-mcp
+HTTP_PORT=3004 LND_MACAROON_BASE64=<macaroon> LND_REST_HOST=https://localhost:8080 npx ln-mcp
 # Then tunnel: ngrok http 3004
 # Paste the ngrok URL + /mcp into ChatGPT Settings → Apps → Create
 ```
@@ -66,7 +66,7 @@ HTTP_PORT=3004 LND_MACAROON_BASE64=<macaroon> LND_REST_HOST=https://localhost:80
 ```
 AI Agent (Claude/ChatGPT/Gemini)
     ↕ MCP (stdio or HTTP)
-lightning-wallet-mcp
+ln-mcp
     ↕ HTTPS + macaroon
 LND REST API (your node)
 ```

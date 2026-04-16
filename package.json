@@ -1,10 +1,10 @@
 {
-  "name": "lightning-wallet-mcp",
+  "name": "ln-mcp",
   "version": "0.2.0",
   "description": "MCP server that gives AI agents a Bitcoin Lightning wallet — pay invoices, fetch L402 APIs, manage budgets",
   "type": "module",
   "bin": {
-    "lightning-wallet-mcp": "index.js"
+    "ln-mcp": "index.js"
   },
   "files": [
     "index.js",
