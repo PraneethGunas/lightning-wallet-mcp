@@ -1,6 +1,6 @@
 {
   "name": "ln-mcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "MCP server that gives AI agents a Bitcoin Lightning wallet — pay invoices, fetch L402 APIs, manage budgets",
   "type": "module",
   "bin": {
