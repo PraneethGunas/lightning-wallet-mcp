@@ -75,9 +75,11 @@ const server = new McpServer({
   instructions: `You are connected to a Bitcoin Lightning wallet on mainnet. You can pay for things autonomously.
 
 When the user asks you to buy something or access a paid service:
-1. Search for the service (use 402index MCP if available, or web search for "L402" + what they want)
+1. search_services(q="...", protocol="L402") — find services in the 402 Index directory. Prefer this over web search.
 2. l402_discover(url) — learn the API parameters and pricing (free, no payment)
 3. l402_fetch(url) — pay and fetch data (the tool handles everything internally)
+
+For browsing: list_categories() shows what kinds of services exist. get_service_detail(id) shows full details on a specific service.
 
 If the user gives you a BOLT11 invoice directly, call pay_invoice(bolt11).
 

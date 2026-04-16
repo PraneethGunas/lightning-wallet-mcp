@@ -625,4 +625,82 @@ export function registerTools(server, getAgentContext, opts = {}) {
       return reply(result);
     })
   );
+
+  // ── 9-12. 402 Index directory — find paid services to use ────────────────
+  //
+  // Proxies the public 402index.io API so agents can discover L402 / x402 / MPP
+  // endpoints without needing a separate directory MCP.
+  const INDEX_BASE = opts.indexBase || "https://402index.io/api/v1";
+
+  async function indexFetch(path) {
+    const res = await fetch(`${INDEX_BASE}${path}`, {
+      signal: AbortSignal.timeout(10_000),
+      headers: { "Accept": "application/json", "Accept-Encoding": "identity" },
+    });
+    const text = await res.text();
+    try { return JSON.parse(text); }
+    catch { return { error: `Directory returned non-JSON (${res.status})`, body: text.slice(0, 500) }; }
+  }
+
+  server.tool(
+    "search_services",
+    "Search the 402 Index directory of paid APIs (L402 Bitcoin, x402 USDC, MPP fiat). Use this FIRST when the user asks for a service — before guessing URLs or searching the web. Returns services with health status, pricing, and URL. Example: q='weather', protocol='L402', max_price_usd=0.01.",
+    {
+      q: z.string().optional().describe("Search term — matches name, description, URL"),
+      protocol: z.enum(["L402", "x402", "MPP"]).optional().describe("Payment protocol filter. Use L402 for Bitcoin Lightning."),
+      category: z.string().optional().describe("Category prefix filter (e.g. 'data', 'ai', 'crypto')"),
+      max_price_usd: z.number().optional().describe("Maximum price per call in USD"),
+      health: z.enum(["healthy", "degraded", "down", "unknown"]).optional().describe("Health status filter. Prefer 'healthy'."),
+      featured: z.boolean().optional().describe("Only featured services"),
+      limit: z.number().int().min(1).max(200).optional().describe("Results per page (default 10, max 200)"),
+      offset: z.number().int().min(0).optional().describe("Pagination offset"),
+      sort: z.enum(["name", "price", "latency", "uptime"]).optional().describe("Sort field"),
+      order: z.enum(["asc", "desc"]).optional().describe("Sort order"),
+      fields: z.string().optional().describe("Comma-separated fields to return (default: name,url,protocol,price_sats,health_status). Use '*' for all."),
+    },
+    wrapTool(async (args) => {
+      const params = new URLSearchParams();
+      for (const [k, v] of Object.entries(args)) {
+        if (v !== undefined && v !== null && v !== "") params.set(k, String(v));
+      }
+      const qs = params.toString();
+      const data = await indexFetch(`/services${qs ? `?${qs}` : ""}`);
+      return reply(data);
+    })
+  );
+
+  server.tool(
+    "list_categories",
+    "List all service categories in the 402 Index with counts. Use this to explore what kinds of paid APIs exist before searching. Returns category names and endpoint counts.",
+    {
+      summary: z.boolean().optional().describe("Return just names + totals (default true). Set false for full protocol/subcategory breakdown."),
+    },
+    wrapTool(async ({ summary }) => {
+      const qs = summary === false ? "?summary=false" : "?summary=true";
+      const data = await indexFetch(`/categories${qs}`);
+      return reply(data);
+    })
+  );
+
+  server.tool(
+    "get_service_detail",
+    "Get full details for a service from the 402 Index by its ID — including health history, pricing, supported methods, and schema. Call this after search_services to inspect a candidate before using it.",
+    {
+      id: z.string().describe("Service ID returned by search_services (UUID)"),
+    },
+    wrapTool(async ({ id }) => {
+      const data = await indexFetch(`/services/${encodeURIComponent(id)}`);
+      return reply(data);
+    })
+  );
+
+  server.tool(
+    "get_directory_stats",
+    "Get overall 402 Index directory stats — total endpoints, breakdown by protocol (L402 / x402 / MPP), health status counts, and sync timestamps.",
+    {},
+    wrapTool(async () => {
+      const data = await indexFetch(`/health`);
+      return reply(data);
+    })
+  );
 }
