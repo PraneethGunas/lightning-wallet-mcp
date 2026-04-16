@@ -33,7 +33,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/PraneethGunas/lightning-wallet-mcp"
+    "url": "git+https://github.com/PraneethGunas/ln-mcp.git"
   },
   "license": "MIT",
   "engines": {
