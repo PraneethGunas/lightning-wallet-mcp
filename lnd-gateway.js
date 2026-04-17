@@ -54,28 +54,78 @@ export async function getBalance() {
 // ── Payments ────────────────────────────────────────────────────────────────
 
 export async function sendPayment(bolt11) {
+  if (!_host || !_macaroonHex) throw new Error("LND not initialized");
+
+  // Use SendPaymentV2 (streaming) for timeout + cancel support.
+  // no_inflight_updates=true means we only get the terminal SUCCEEDED/FAILED.
+  const controller = new AbortController();
+  const safetyTimeout = setTimeout(() => controller.abort(), 90_000);
+
   try {
-    // POST /v1/channels/transactions = SendPaymentSync (unary, litd-compatible)
-    const data = await lndRest("POST", "/v1/channels/transactions", {
-      payment_request: bolt11,
+    const res = await fetch(`${_host}/v2/router/send`, {
+      method: "POST",
+      headers: {
+        "Grpc-Metadata-macaroon": _macaroonHex,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        payment_request: bolt11,
+        timeout_seconds: 60,
+        fee_limit_sat: "1000",
+        no_inflight_updates: true,
+      }),
+      signal: controller.signal,
     });
 
-    if (data.payment_error) {
-      return { success: false, error: data.payment_error };
+    // Read NDJSON stream line by line
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split("\n");
+      buffer = lines.pop(); // keep incomplete trailing line
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        let parsed;
+        try { parsed = JSON.parse(line); } catch { continue; }
+        const payment = parsed.result || parsed;
+
+        if (payment.status === "SUCCEEDED") {
+          const { balance_sats } = await getBalance();
+          return {
+            success: true,
+            amount_sats: parseInt(payment.value_sat || "0"),
+            fee_sats: parseInt(payment.fee_sat || "0"),
+            preimage: payment.payment_preimage || "",  // already hex from V2
+            balance_remaining_sats: balance_sats,
+          };
+        }
+
+        if (payment.status === "FAILED") {
+          const reason = payment.failure_reason || "UNKNOWN";
+          return {
+            success: false,
+            error: reason,
+            budget_exceeded: reason === "FAILURE_REASON_INSUFFICIENT_BALANCE",
+          };
+        }
+      }
     }
 
-    const { balance_sats } = await getBalance();
-    return {
-      success: true,
-      amount_sats: parseInt(data.payment_route?.total_amt || "0"),
-      fee_sats: parseInt(data.payment_route?.total_fees || "0"),
-      preimage: data.payment_preimage
-        ? Buffer.from(data.payment_preimage, "base64").toString("hex")
-        : "",
-      balance_remaining_sats: balance_sats,
-    };
+    return { success: false, error: "payment stream ended without terminal state" };
   } catch (err) {
+    if (err.name === "AbortError") {
+      return { success: false, error: "payment timed out after 90s" };
+    }
     return { success: false, error: err.message || String(err) };
+  } finally {
+    clearTimeout(safetyTimeout);
   }
 }
 

@@ -130,12 +130,12 @@ export function registerTools(server, getAgentContext, opts = {}) {
 
       if (!result.success) {
         let invoiceForwarded = false;
-        if (opts.webhookUrl) {
+        if (result.budget_exceeded && opts.webhookUrl) {
           try {
             await fetch(opts.webhookUrl, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ event: "payment_failed", bolt11, amount_sats: decoded.amount_sats, description: decoded.description, error: result.error, timestamp: new Date().toISOString() }),
+              body: JSON.stringify({ event: "budget_exceeded", bolt11, amount_sats: decoded.amount_sats, description: decoded.description, error: result.error, timestamp: new Date().toISOString() }),
             });
             invoiceForwarded = true;
           } catch {}
@@ -148,7 +148,7 @@ export function registerTools(server, getAgentContext, opts = {}) {
           invoice_forwarded: invoiceForwarded,
           invoice: { bolt11, amount_sats: decoded.amount_sats, amount_usd: satsToUsd(decoded.amount_sats, btcPrice), description: decoded.description },
           TELL_USER: invoiceForwarded
-            ? `The invoice for ${decoded.amount_sats} sats ($${satsToUsd(decoded.amount_sats, btcPrice)}) has been sent to your Aegis wallet app. Open it and tap "Pay directly" to complete this purchase.`
+            ? `Your agent budget is insufficient for this ${decoded.amount_sats} sats ($${satsToUsd(decoded.amount_sats, btcPrice)}) payment. The invoice has been sent to your Aegis wallet. Open it and tap "Pay directly" to complete this purchase.`
             : `Payment failed: ${result.error}`,
         });
       }
@@ -356,25 +356,27 @@ export function registerTools(server, getAgentContext, opts = {}) {
       const payment = await lnd.sendPayment(challenge.invoice);
 
       if (!payment.success) {
+        // Only forward to webhook when budget is exceeded — not for routing/timeout failures
         let invoiceForwarded = false;
-        if (opts.webhookUrl) {
+        if (payment.budget_exceeded && opts.webhookUrl) {
           try {
             await fetch(opts.webhookUrl, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ event: "payment_failed", bolt11: challenge.invoice, amount_sats: decoded.amount_sats, description: decoded.description, error: payment.error, url, timestamp: new Date().toISOString() }),
+              body: JSON.stringify({ event: "budget_exceeded", bolt11: challenge.invoice, amount_sats: decoded.amount_sats, description: decoded.description, error: payment.error, url, timestamp: new Date().toISOString() }),
             });
             invoiceForwarded = true;
           } catch {}
         }
         if (invoiceForwarded) {
-          steps.push({ step: 5, action: "invoice_forwarded", detail: `Invoice for ${decoded.amount_sats} sats forwarded to wallet app` });
+          steps.push({ step: 5, action: "invoice_forwarded", detail: `Budget exceeded — invoice for ${decoded.amount_sats} sats forwarded to wallet app` });
           return reply({
             steps,
             success: false,
             invoice_forwarded: true,
+            reason: "budget_exceeded",
             invoice: { bolt11: challenge.invoice, amount_sats: decoded.amount_sats, amount_usd: satsToUsd(decoded.amount_sats, btcPrice), description: decoded.description },
-            TELL_USER: `The invoice for ${decoded.amount_sats} sats ($${satsToUsd(decoded.amount_sats, btcPrice)}) has been sent to your Aegis wallet app. Open it and tap "Pay directly" to complete this purchase.`,
+            TELL_USER: `Your agent budget is insufficient for this ${decoded.amount_sats} sats ($${satsToUsd(decoded.amount_sats, btcPrice)}) payment. The invoice has been sent to your Aegis wallet. Open it and tap "Pay directly" to complete this purchase.`,
           });
         }
         steps.push({ step: 5, action: "payment_failed", detail: payment.error });
