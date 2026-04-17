@@ -48,18 +48,20 @@ HTTP_PORT=3004 LND_MACAROON_BASE64=<macaroon> LND_REST_HOST=https://localhost:80
 # Paste the ngrok URL + /mcp into ChatGPT Settings → Apps → Create
 ```
 
-## Tools (8)
+## Tools (10)
 
 | Tool | Description |
 |------|-------------|
 | `pay_invoice` | Pay a BOLT11 Lightning invoice |
 | `l402_fetch` | Fetch a URL with automatic L402 payment (402 → pay → retry, one call) |
 | `l402_discover` | Discover API params and pricing before paying (free) |
-| `get_balance` | Check spending allowance |
-| `decode_invoice` | Inspect a BOLT11 invoice before paying |
 | `create_invoice` | Generate an invoice to receive payment |
 | `list_payments` | Recent payment history |
-| `get_spending_summary` | Total spent, fees, cached L402 tokens |
+| `get_spending_summary` | Total spent, fees, remaining balance, cached L402 tokens |
+| `search_services` | Search the 402 Index directory for paid APIs |
+| `list_categories` | Browse available service categories |
+| `get_service_detail` | Full details on a specific service |
+| `get_directory_stats` | Directory-wide stats and health |
 
 ## How It Works
 

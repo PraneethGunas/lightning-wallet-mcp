@@ -89,11 +89,11 @@ export function registerTools(server, getAgentContext, opts = {}) {
   // ── 1. pay_invoice ────────────────────────────────────────────────────────
   server.tool(
     "pay_invoice",
-    "Pay a BOLT11 Lightning invoice with real Bitcoin. Budget enforced cryptographically by LND — exceeding it rejects the payment and notifies the user. Use max_cost_sats to refuse invoices above a threshold. Always decode_invoice first for large amounts. Report cost and remaining balance after payment.",
+    "Pay a BOLT11 Lightning invoice with real Bitcoin. Budget enforced by LND — if exceeded, the invoice is forwarded to the user's wallet app and a TELL_USER message is returned for you to relay. The tool decodes the invoice internally. Report cost and remaining balance after payment.",
     {
       bolt11: z.string().describe("BOLT11 invoice string"),
       purpose: z.string().describe("Why this payment is being made"),
-      max_cost_sats: z.number().int().positive().optional().describe("Optional safety cap set by the USER only. Do NOT set this yourself."),
+      max_cost_sats: z.number().int().positive().optional().describe("Safety cap in sats. Only pass this if the user explicitly told you a maximum amount. Never set it yourself."),
     },
     wrapTool(async ({ bolt11, purpose, max_cost_sats }) => {
       getAgentContext();
@@ -195,42 +195,14 @@ export function registerTools(server, getAgentContext, opts = {}) {
     })
   );
 
-  // ── 3. get_balance ────────────────────────────────────────────────────────
-  server.tool(
-    "get_balance",
-    "Returns current spending allowance in sats and USD when the USER asks about their balance. Do NOT call this before making a payment — just call pay_invoice or l402_fetch directly.",
-    {},
-    wrapTool(async () => {
-      getAgentContext();
-      const { balance_sats } = await lnd.getBalance();
-      const btcPrice = await getBtcUsd();
-      return reply({
-        balance_sats,
-        balance_usd: satsToUsd(balance_sats, btcPrice),
-      });
-    })
-  );
+  // get_balance removed — agents used it to pre-check balance and refuse to pay,
+  // preventing the budget_exceeded → webhook → SSE → user-pays-directly flow.
+  // Balance is still available via get_spending_summary and in every payment receipt.
 
-  // ── 4. decode_invoice ─────────────────────────────────────────────────────
-  server.tool(
-    "decode_invoice",
-    "Decode a BOLT11 invoice to inspect amount, description, destination, and expiry before paying. Use this to verify cost before committing.",
-    {
-      bolt11: z.string().describe("BOLT11 invoice string"),
-    },
-    wrapTool(async ({ bolt11 }) => {
-      getAgentContext();
-      const decoded = await lnd.decodeInvoice(bolt11);
-      if (!decoded.is_valid) return errorReply(decoded.error);
-      const btcPrice = await getBtcUsd();
-      return reply({
-        ...decoded,
-        amount_usd: satsToUsd(decoded.amount_sats, btcPrice),
-      });
-    })
-  );
+  // decode_invoice removed — pay_invoice and l402_fetch decode internally.
+  // A standalone decode tool caused agents to pre-check and hesitate before paying.
 
-  // ── 5. list_payments ──────────────────────────────────────────────────────
+  // ── 3. list_payments ──────────────────────────────────────────────────────
   server.tool(
     "list_payments",
     "List recent payment history with amounts, fees, status, and timestamps.",
@@ -253,13 +225,13 @@ export function registerTools(server, getAgentContext, opts = {}) {
   // ── 6. l402_fetch — automatic L402 payment flow (lnget-style) ────────────
   server.tool(
     "l402_fetch",
-    "Fetch a URL with automatic L402 Lightning payment. Handles 402 → extract invoice → pay → cache token → retry in one call. Tokens cached per URL path (repeat calls are free). IMPORTANT: Call l402_discover first on new services to learn correct endpoints and params — don't waste sats on bad requests. Use max_cost_sats as a safety cap. Use no_cache=true to force fresh payment. ALWAYS show the receipt (invoice, preimage, amount, fees, remaining balance) to the user after a paid call.",
+    "Fetch a URL with automatic L402 Lightning payment. Handles 402 → extract invoice → pay → cache token → retry automatically. Tokens cached per URL path — repeat calls to the same path are free. Call l402_discover first on new services to learn correct endpoints and parameters. If budget is exceeded, the invoice is forwarded to the user's wallet and a TELL_USER message is returned — relay it verbatim. Use no_cache=true to force fresh payment. ALWAYS show the SHOW_TO_USER receipt after a paid call.",
     {
       url: z.string().describe("URL to fetch"),
       method: z.enum(["GET", "POST", "PUT", "DELETE"]).default("GET").describe("HTTP method"),
       headers: z.record(z.string()).optional().describe("Extra HTTP headers"),
       body: z.string().optional().describe("Request body (for POST/PUT)"),
-      max_cost_sats: z.number().int().positive().optional().describe("Optional safety cap set by the USER only. Do NOT set this yourself — let every payment attempt go through regardless of amount."),
+      max_cost_sats: z.number().int().positive().optional().describe("Safety cap in sats. Only pass this if the user explicitly told you a maximum amount. Never set it yourself."),
       no_cache: z.boolean().default(false).optional().describe("Skip token cache — always pay fresh (useful for demos)"),
     },
     wrapTool(async ({ url, method, headers: extraHeaders, body, max_cost_sats, no_cache }) => {
@@ -476,7 +448,7 @@ export function registerTools(server, getAgentContext, opts = {}) {
   // ── 8. l402_discover — fetch API docs before paying ─────────────────────
   server.tool(
     "l402_discover",
-    "Discover how to use an L402 API before spending sats. Returns pricing, endpoint docs, required parameters, and usage instructions — all free. ALWAYS call this on a new service before l402_fetch. Read the response carefully to construct the correct URL with the right query parameters.",
+    "Probe an L402 endpoint to discover pricing, parameters, and usage docs before spending sats. Free — no payment made. Checks the 402 response body, manifest links, and well-known doc paths. Results vary by service — some return full docs, others only pricing. ALWAYS call this on a new service before l402_fetch to learn the correct URL format and query parameters.",
     {
       url: z.string().describe("URL of the L402 endpoint to discover (e.g. https://api.example.com/l402/proxy/service/endpoint)"),
     },

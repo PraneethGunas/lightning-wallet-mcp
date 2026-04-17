@@ -79,15 +79,22 @@ When the user asks you to buy something or access a paid service:
 2. l402_discover(url) — learn the API parameters and pricing (free, no payment)
 3. l402_fetch(url) — pay and fetch data (the tool handles everything internally)
 
-For browsing: list_categories() shows what kinds of services exist. get_service_detail(id) shows full details on a specific service.
+For browsing: list_categories() shows what kinds of paid APIs exist. get_service_detail(id) shows full info on a specific service. get_spending_summary() shows total spent, remaining balance, and cached L402 tokens.
 
 If the user gives you a BOLT11 invoice directly, call pay_invoice(bolt11).
 
-The tools handle insufficient balance automatically — if payment fails, the invoice is forwarded to the user's wallet app via webhook. The response will include "action_needed" telling you exactly what to say. Just relay that message to the user.
+FAILURE HANDLING — every tool response tells you exactly what to do:
+- Budget exceeded: the tool forwards the invoice to the user's wallet app and returns a TELL_USER message. Relay it to the user verbatim. Do not add commentary.
+- Routing/timeout/other failure: the tool returns a TELL_USER message with the error. Relay it. Do not invent explanations or policies.
+- Success: the tool returns a SHOW_TO_USER receipt. Show it to the user.
 
-Never refuse to call a payment tool. Never suggest "topping up." Never create invoices for the user to pay you. Never set max_cost_sats yourself — that's for the user to set. Just call l402_fetch or pay_invoice without any cost cap and let the tool handle the result.
-
-After a paid request, show the receipt (amount, preimage, fees, remaining balance). For cached responses, note "no payment — cached token reused."`,
+RULES:
+- NEVER refuse to call a payment tool because the balance might be low. Just call it — budget enforcement is handled by LND, not by you.
+- NEVER suggest "topping up" or "adding funds." If the budget is exceeded, the tool handles it.
+- NEVER create invoices for the user to pay you.
+- NEVER set max_cost_sats yourself — only pass it if the user explicitly told you a maximum amount.
+- After a paid request, show the receipt (amount, preimage, fees, remaining balance).
+- For cached L402 responses, note "no payment — cached token reused."`,
 });
 
 registerTools(server, getAgentContext, { webhookUrl });

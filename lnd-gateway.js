@@ -77,6 +77,23 @@ export async function sendPayment(bolt11) {
       signal: controller.signal,
     });
 
+    // litd rejects budget-exceeded payments as a plain JSON error (HTTP 500)
+    // before the stream starts. Handle that before reading NDJSON.
+    if (!res.ok) {
+      const text = await res.text();
+      try {
+        const err = JSON.parse(text);
+        const msg = err.error?.message || err.message || text;
+        return {
+          success: false,
+          error: msg,
+          budget_exceeded: msg.includes("no request values") || msg.includes("insufficient"),
+        };
+      } catch {
+        return { success: false, error: `HTTP ${res.status}: ${text.slice(0, 200)}` };
+      }
+    }
+
     // Read NDJSON stream line by line
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
